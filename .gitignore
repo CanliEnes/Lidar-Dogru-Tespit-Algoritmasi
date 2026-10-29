@@ -1,0 +1,16 @@
+# Derlenmiş dosyalar
+*.exe
+*.o
+*.out
+lidar_dogru_tespit
+
+# Programın her çalışmada ürettiği çıktılar
+*.dat
+plot_script.gp
+indirilen_scan.toml
+
+# Editör / sistem dosyaları
+.vscode/
+.idea/
+Thumbs.db
+.DS_Store
