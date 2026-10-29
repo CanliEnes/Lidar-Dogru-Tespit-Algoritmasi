@@ -68,9 +68,7 @@ double ikiDogruAci(Dogru d1, Dogru d2) {
         return 90.0 - abs(atan(d1.m) * 180.0 / PI);
     }
     if (!isnan(d1.m) && !isnan(d2.m)) {
-        if (abs(1.0 + d1.m * d2.m) < 0.0001) { return 90.0; } // Dik kesişim
-        // Paydanın sıfır olmamasını sağlamak için ek kontrol (çok küçük eğimler için nadir)
-        if (abs(1.0 + d1.m * d2.m) < 1e-9) return 90.0; // Pratik olarak dik
+        if (abs(1.0 + d1.m * d2.m) < 0.0001) { return 90.0; } // Dik kesişim (payda ~0)
         double tan_theta = abs((d1.m - d2.m) / (1.0 + d1.m * d2.m));
         return atan(tan_theta) * 180.0 / PI;
     }
@@ -78,7 +76,7 @@ double ikiDogruAci(Dogru d1, Dogru d2) {
 }
 
 Nokta ikiDogruKesisim(Dogru d1, Dogru d2, bool& bulundu) {
-    Nokta kesisim_p = { 0.0, 0.0 }; // C4700 HATASI ÇÖZÜMÜ!!!!!!!!!!!!!!!!!
+    Nokta kesisim_p = { 0.0, 0.0 }; // Başlangıç değeri (MSVC C4700 uyarısını önler)
     bulundu = false;
     if (d1.dikey_mi && d2.dikey_mi) {
         bulundu = false; // Paralel
@@ -101,13 +99,8 @@ Nokta ikiDogruKesisim(Dogru d1, Dogru d2, bool& bulundu) {
         return kesisim_p;
     }
 
+    // Paralel (payda ~0) veya geçersiz eğim
     if (isnan(d1.m) || isnan(d2.m) || abs(d1.m - d2.m) < 0.0001) {
-        bulundu = false; // Paralel veya geçersiz eğim
-        return kesisim_p;
-    }
-
-    // Paydanın sıfır olmamasını sağlama (pratik olarak)
-    if (abs(d1.m - d2.m) < 1e-9) {
         bulundu = false;
         return kesisim_p;
     }
@@ -172,35 +165,50 @@ Dogru dogruyaEnIyiUyanCizgiyiBul(const vector<Nokta>& noktalar) {
 
 // --- ANA FONKSİYON ---
 
-int main()
+int main(int argc, char* argv[])
 {
     // --- MOD SEÇİMİ ---
-    bool test_modu = true; // Test modu için 'true', Sunum modu için 'false' yap
+    // Kullanım:
+    //   lidar_dogru_tespit                -> örnek veri (ornek-veri/scan_data_NaN.toml)
+    //   lidar_dogru_tespit dosya.toml     -> verilen dosya
+    //   lidar_dogru_tespit --sunum        -> sunucudan rastgele dosya indir
+    const string varsayilan_dosya = "ornek-veri/scan_data_NaN.toml";
+    bool test_modu = true;
+    string yerel_test_dosyasi = varsayilan_dosya;
+
+    if (argc > 1) {
+        string arguman = argv[1];
+        if (arguman == "--sunum") {
+            test_modu = false;
+        }
+        else {
+            yerel_test_dosyasi = arguman;
+        }
+    }
 
     if (test_modu) {
-        srand(1); 
+        srand(1); // Test modunda her çalışmada aynı sonuç
     }
     else {
         srand(time(NULL)); // sunum modu için her seferinde farklı rastgelelik
     }
 
-    string kullanilacak_dosya_adi; 
+    string kullanilacak_dosya_adi;
 
     if (test_modu) {
         // --- YEREL DOSYA OKUMA ---
-        string yerel_test_dosyasi = "C:\\Users\\canli\\Downloads\\scan_data_NaN.toml";
         cout << "--- TEST MODU AKTIF ---" << endl;
         cout << "Yerel test dosyasi kullaniliyor: " << yerel_test_dosyasi << endl;
         kullanilacak_dosya_adi = yerel_test_dosyasi; // Test modunda doğrudan bu dosyayı kullan
     }
     else {
         // --- INTERNETTEN INDIRME ---
-        int dosya_numarasi = (rand() % 5) + 1; 
+        int dosya_numarasi = (rand() % 5) + 1;
         string base_url = "http://abilgisayar.kocaeli.edu.tr/lidar";
         string file_extension = ".toml";
-        string url = "base_url + to_string(dosya_numarasi) + file_extension";
-        string indirilen_dosya_adi = "indirilen_scan.toml"; 
-        string download_command = "curl -o " + indirilen_dosya_adi + " " + url;
+        string url = base_url + to_string(dosya_numarasi) + file_extension;
+        string indirilen_dosya_adi = "indirilen_scan.toml";
+        string download_command = "curl -f -o " + indirilen_dosya_adi + " " + url; // -f: HTTP hatasında (404/403) başarısız say
 
         cout << "--- SUNUM MODU AKTIF ---" << endl;
         cout << "Rastgele secilen dosya: lidar" << dosya_numarasi << ".toml" << endl;
@@ -209,7 +217,7 @@ int main()
         if (result != 0) {
             cout << "Dosya indirme basarisiz! 'curl' kurulu ve internet baglantisi oldugundan emin olun." << endl;
             cout << "Indirme basarisiz, yerel test dosyasi kullanilacak..." << endl;
-            kullanilacak_dosya_adi = "C:\\Users\\canli\\Downloads\\scan_data_NaN.toml"; // Hata durumunda test dosyasını kullan güvenlik içindir
+            kullanilacak_dosya_adi = varsayilan_dosya; // Hata durumunda örnek veriyle devam et
         }
         else {
             cout << "Dosya basariyla indirildi: " << indirilen_dosya_adi << endl;
@@ -332,10 +340,10 @@ int main()
     
     // --- DOĞRU TESPİTİ: RANSAC ---
 
-    const double UZAKLIK_TOLERANSI = 0.02; // 6cm (noktanın doğruya uzaklığı)
+    const double UZAKLIK_TOLERANSI = 0.02; // 2cm (noktanın doğruya uzaklığı)
     const int MIN_DESTEKCI_SAYISI = 8;
     const int ITERASYON_SAYISI = 3000;
-    const double MAX_NOKTA_ARASI_MESAFE = 1; // Bir doğru üzerindeki iki nokta arası max mesafe (12cm)
+    const double MAX_NOKTA_ARASI_MESAFE = 1.0; // Bir doğru üzerindeki ardışık iki nokta arası max mesafe (1m)
 
     vector<Dogru> tespitEdilenDogrular;
     vector<Nokta> kalan_noktalar = gecerli_noktalar;
@@ -695,7 +703,9 @@ int main()
     cout << "Gnuplot script'i (plot_script.gp) GUNCELLENDI." << endl;
 
     cout << "Grafik ciziliyor..." << endl;
-    system("gnuplot -p plot_script.gp");
+    if (system("gnuplot -p plot_script.gp") != 0) {
+        cout << "Gnuplot calistirilamadi. Kurulu oldugundan emin olun; grafigi daha sonra 'gnuplot -p plot_script.gp' ile acabilirsiniz." << endl;
+    }
 
     return 0;
 }
