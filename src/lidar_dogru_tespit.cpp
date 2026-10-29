@@ -569,7 +569,7 @@ bool gnuplotBetigiYaz(const vector<Dogru>& dogrular, bool hedef_bulundu, const K
 
         stringstream label_ss;
         label_ss.precision(2);
-        label_ss << "'Kesisim: (d" << en_yakin_hedef.dogru_index1 + 1 << " & d" << en_yakin_hedef.dogru_index2 + 1 << ") "
+        label_ss << "'Kesisim: (d" << en_yakin_hedef.dogru_index1 + 1 << " ve d" << en_yakin_hedef.dogru_index2 + 1 // '&' gnuplot enhanced modda özel karakter << ") "
             << "Aci: " << (int)en_yakin_hedef.aci << " derece "
             << "Mesafe: " << fixed << en_yakin_hedef.robota_mesafe << "m'";
         script_file << "\n# --- Hedef Etiketleri ---\n";
